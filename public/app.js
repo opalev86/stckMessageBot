@@ -1,6 +1,55 @@
 const notesContainer = document.getElementById("notes");
 let loadedNotes = new Set(); // чтобы не менять старые
 let firstLoad = true;
+const renderedAuthors = new Set(); // чтобы авторы не «прыгали»
+
+function hashString(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function renderAuthorsBackground(notes) {
+  const authorsSet = new Set();
+  notes.forEach(n => {
+    if (n.author) {
+      authorsSet.add(n.author);
+    }
+  });
+
+  const authors = Array.from(authorsSet);
+  if (!authors.length) return;
+
+  const containerWidth = notesContainer.offsetWidth || window.innerWidth;
+  const containerHeight =
+    notesContainer.scrollHeight || notesContainer.offsetHeight || window.innerHeight;
+
+  const maxLabels = Math.min(authors.length, 20);
+
+  for (let i = 0; i < maxLabels; i++) {
+    const name = authors[i];
+    if (renderedAuthors.has(name)) continue;
+
+    const span = document.createElement("div");
+    span.className = "author-bg";
+    span.textContent = name;
+
+    const h = hashString(name);
+    const x = (h % Math.max(containerWidth - 120, 100)) + 60;
+    const y = (Math.floor(h / 997) % Math.max(containerHeight - 80, 80)) + 40;
+    const angle = ((h % 21) - 10); // -10..+10
+
+    span.style.left = x + "px";
+    span.style.top = y + "px";
+    span.style.transform = `rotate(${angle}deg)`;
+
+    notesContainer.appendChild(span);
+    renderedAuthors.add(name);
+  }
+}
 
 async function loadNotes(){
   const res = await fetch("/notes");
@@ -42,9 +91,10 @@ async function loadNotes(){
   });
 
   firstLoad = false; // далее новые заметки просто добавляются сверху
+
+  // обновляем список авторов на фоне
+  renderAuthorsBackground(notes);
 }
-
-
 
 loadNotes();
 setInterval(loadNotes, 3000); // автообновление

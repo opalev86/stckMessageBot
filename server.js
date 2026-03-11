@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS notes (
 )
 `);
 
+// Добавляем колонку для автора, если её ещё нет
+db.run("ALTER TABLE notes ADD COLUMN author TEXT", (err) => {
+  if (err && !String(err.message).includes("duplicate column name")) {
+    console.error("Ошибка при добавлении колонки author:", err.message);
+  }
+});
+
 // токен берём из переменной окружения или отдельного файла
 let TOKEN = process.env.TELEGRAM_TOKEN;
 if (!TOKEN) {
@@ -48,9 +55,14 @@ bot.on("message", (msg) => {
     const colors = ["#fff59d","#ffe082","#ffd54f"];
     const color = colors[Math.floor(Math.random()*colors.length)];
 
+    const from = msg.from || {};
+    const author =
+      from.username ? `@${from.username}` :
+      [from.first_name, from.last_name].filter(Boolean).join(" ") || "unknown";
+
     db.run(
-      "INSERT INTO notes (text, color) VALUES (?,?)",
-      [text, color]
+      "INSERT INTO notes (text, color, author) VALUES (?,?,?)",
+      [text, color, author]
     );
   }
 });
