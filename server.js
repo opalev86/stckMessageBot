@@ -16,32 +16,35 @@ CREATE TABLE IF NOT EXISTS notes (
 )
 `);
 
-// TELEGRAM TOKEN
-const TOKEN = "--";
-
+const TOKEN = "ВАШ_TELEGRAM_BOT_TOKEN";
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// сообщение из telegram -> записка
+// Обработка сообщений
 bot.on("message", (msg) => {
-
   const text = msg.text;
 
-  const colors = [
-    "#fff59d",
-    "#ffe082",
-    "#ffd54f"
-  ];
+  if(text === "/clear"){
+    // очистка таблицы
+    db.run("DELETE FROM notes", [], (err)=>{
+      if(err){
+        bot.sendMessage(msg.chat.id, "Ошибка при очистке заметок!");
+      } else {
+        bot.sendMessage(msg.chat.id, "Все заметки удалены ✅");
+      }
+    });
+  } else {
+    // обычная заметка
+    const colors = ["#fff59d","#ffe082","#ffd54f"];
+    const color = colors[Math.floor(Math.random()*colors.length)];
 
-  const color = colors[Math.floor(Math.random()*colors.length)];
-
-  db.run(
-    "INSERT INTO notes (text, color) VALUES (?,?)",
-    [text, color]
-  );
-
+    db.run(
+      "INSERT INTO notes (text, color) VALUES (?,?)",
+      [text, color]
+    );
+  }
 });
 
-// API сайта
+// API для сайта
 app.get("/notes", (req,res)=>{
   db.all("SELECT * FROM notes ORDER BY id DESC",(err,rows)=>{
     res.json(rows);
