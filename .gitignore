@@ -4,3 +4,7 @@ dist/
 build/
 .DS_Store
 *.log
+
+# секреты / локальные конфиги
+.env
+telegram_token.txt

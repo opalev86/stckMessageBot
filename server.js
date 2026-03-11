@@ -1,6 +1,7 @@
 const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
 const TelegramBot = require("node-telegram-bot-api");
+const fs = require("fs");
 
 const app = express();
 app.use(express.json());
@@ -16,7 +17,17 @@ CREATE TABLE IF NOT EXISTS notes (
 )
 `);
 
-const TOKEN = "7845070239:AAHb7QIza65Fqry96mbQgGSL_K-QV1ZC7NM";
+// токен берём из переменной окружения или отдельного файла
+let TOKEN = process.env.TELEGRAM_TOKEN;
+if (!TOKEN) {
+  try {
+    TOKEN = fs.readFileSync("telegram_token.txt", "utf8").trim();
+  } catch (e) {
+    console.error("Не найден токен Telegram. Установите TELEGRAM_TOKEN или создайте файл telegram_token.txt");
+    process.exit(1);
+  }
+}
+
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 // Обработка сообщений
