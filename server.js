@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS notes (
 )
 `);
 
-const TOKEN = "ВАШ_TELEGRAM_BOT_TOKEN";
+const TOKEN = "7845070239:AAHb7QIza65Fqry96mbQgGSL_K-QV1ZC7NM";
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 // Обработка сообщений
