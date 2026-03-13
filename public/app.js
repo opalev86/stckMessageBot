@@ -2,6 +2,7 @@ const notesContainer = document.getElementById("notes");
 let loadedNotes = new Set(); // чтобы не менять старые
 let firstLoad = true;
 const renderedAuthors = new Set(); // чтобы авторы не «прыгали»
+let watermarkRendered = false;
 
 function hashString(str) {
   let h = 0;
@@ -51,6 +52,33 @@ function renderAuthorsBackground(notes) {
   }
 }
 
+function renderWatermark() {
+  if (watermarkRendered) return;
+
+  const positions = [
+    [5, 10],
+    [40, 20],
+    [75, 12],
+    [15, 45],
+    [55, 50],
+    [80, 42],
+    [10, 78],
+    [45, 82],
+    [78, 70],
+  ];
+
+  positions.forEach(([x, y]) => {
+    const el = document.createElement("div");
+    el.className = "watermark";
+    el.textContent = "t.me/StickMessageBot";
+    el.style.left = x + "%";
+    el.style.top = y + "%";
+    notesContainer.appendChild(el);
+  });
+
+  watermarkRendered = true;
+}
+
 async function loadNotes(){
   const res = await fetch("/notes");
   const notes = await res.json();
@@ -63,7 +91,14 @@ async function loadNotes(){
 
     const div = document.createElement("div");
     div.className = "note";
-    div.innerText = n.text;
+    div.dataset.id = String(n.id);
+
+    const author = n.author || "";
+    const authorEl = author
+      ? `<div class="note-author">${author}</div>`
+      : "";
+
+    div.innerHTML = `${authorEl}<div class="note-text">${n.text}</div>`;
     div.style.background = n.color || "#ffeb3b";
 
     if(firstLoad){
@@ -89,6 +124,19 @@ async function loadNotes(){
     notesContainer.appendChild(div);
     loadedNotes.add(n.id);
   });
+
+  // удаляем исчезнувшие заметки без перезагрузки страницы
+  const currentIds = new Set(notes.map(n => String(n.id)));
+  document.querySelectorAll(".note").forEach(el => {
+    const id = el.dataset.id;
+    if (id && !currentIds.has(id)) {
+      el.remove();
+    }
+  });
+  loadedNotes = new Set(Array.from(currentIds).map(id => Number(id)));
+
+  // отрисуем водяной знак один раз
+  renderWatermark();
 
   firstLoad = false; // далее новые заметки просто добавляются сверху
 

@@ -29,7 +29,7 @@ button{
   min-height: 100vh;
   padding: 20px;
   overflow-y: auto;
-  background-color: #050b08; /* почти чёрная доска */
+  background-color: #060b09; /* тёмная, но не полностью чёрная доска */
   background-image:
     linear-gradient(
       rgba(255,255,255,0.12) 1px,
@@ -40,11 +40,11 @@ button{
       rgba(255,255,255,0.06) 1px,
       transparent 1px
     ),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Cstyle%3Etext%7Bfill:rgba(255,255,255,0.25);font-family:monospace;font-size:20px;%7D%3C/style%3E%3Ctext x='20' y='50'%3EE%3Dmc%5E2%3C/text%3E%3Ctext x='200' y='120'%3Ea%5E2%2Bb%5E2%3Dc%5E2%3C/text%3E%3Ctext x='40' y='200'%3Eint%20f(x)dx%3C/text%3E%3Ctext x='230' y='60'%3Esin(x)%2Bcos(x)%3C/text%3E%3Ctext x='70' y='260'%3ES%3Dpi*r%5E2%3C/text%3E%3C/svg%3E");
+    url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='320'%3E%3Cstyle%3Etext%7Bfill:rgb(220,220,220);font-family:monospace;font-size:22px;%7D%3C/style%3E%3Ctext x='20' y='60'%3EE%3Dmc%5E2%3C/text%3E%3Ctext x='210' y='140'%3Ea%5E2%2Bb%5E2%3Dc%5E2%3C/text%3E%3Ctext x='40' y='230'%3Eint%20f(x)dx%3C/text%3E%3Ctext x='240' y='80'%3Esin(x)%2Bcos(x)%3C/text%3E%3Ctext x='80' y='290'%3ES%3Dpi*r%5E2%3C/text%3E%3C/svg%3E\");
   background-size:
     40px 40px,
     40px 40px,
-    400px 300px;
+    420px 320px;
   background-blend-mode: soft-light, soft-light, normal;
   box-shadow: inset 0 0 35px rgba(0,0,0,0.7);
 }
@@ -57,6 +57,17 @@ button{
   transform: translateX(-50%);
   font-size: 10px;
   color: rgba(255,255,255,0.25);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#notes::before{
+  content: "t.me/StickMessageBot";
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.22);
   pointer-events: none;
   white-space: nowrap;
 }
@@ -139,6 +150,23 @@ html::after{
   transition: transform 0.2s, top 0.2s;
 }
 
+.note-author{
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  color: rgba(0,0,0,0.35);
+  pointer-events: none;
+  max-width: 80%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-text{
+  margin-top: 14px;
+}
+
 .author-bg{
   position: absolute;
   z-index: 1;
@@ -147,6 +175,16 @@ html::after{
   pointer-events: none;
   white-space: nowrap;
   user-select: none;
+}
+
+.watermark{
+  position: absolute;
+  z-index: 0;
+  font-size: 16px;
+  color: rgba(255,255,255,0.16);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
 }
 
 .note::after{

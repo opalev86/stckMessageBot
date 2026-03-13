@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="stickyNote" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff59d"/>
+      <stop offset="100%" stop-color="#ffd54f"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="100%" stop-color="#f5d000"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="48" height="48" rx="6" ry="6" fill="url(#stickyNote)" stroke="#f1c232" stroke-width="2"/>
+  <path d="M40 8 L56 8 L56 24 Z" fill="url(#fold)" />
+  <line x1="16" y1="24" x2="48" y2="24" stroke="#fbc02d" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="32" x2="44" y2="32" stroke="#fbc02d" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="40" x2="38" y2="40" stroke="#fbc02d" stroke-width="2" stroke-linecap="round"/>
+</svg>
