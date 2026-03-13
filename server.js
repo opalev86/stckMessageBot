@@ -10,6 +10,17 @@ app.use(express.static("public"));
 
 const db = new sqlite3.Database("database.db");
 
+// простой счётчик текущих посетителей (по открытым вкладкам)
+let visitors = 0;
+const sseClients = new Set();
+
+function broadcastVisitors(){
+  const payload = `data: ${JSON.stringify({ visitors })}\n\n`;
+  sseClients.forEach((res) => {
+    res.write(payload);
+  });
+}
+
 db.run(`
 CREATE TABLE IF NOT EXISTS notes (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,6 +28,26 @@ CREATE TABLE IF NOT EXISTS notes (
  color TEXT
 )
 `);
+
+// SSE-стрим с количеством текущих посетителей
+app.get("/visitors/stream", (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  res.write("\n");
+
+  visitors += 1;
+  sseClients.add(res);
+  broadcastVisitors();
+
+  req.on("close", () => {
+    visitors = Math.max(0, visitors - 1);
+    sseClients.delete(res);
+    broadcastVisitors();
+  });
+});
 
 // Добавляем недостающие колонки, если их ещё нет
 db.run("ALTER TABLE notes ADD COLUMN author TEXT", (err) => {
@@ -37,6 +68,12 @@ db.run("ALTER TABLE notes ADD COLUMN telegram_user_id INTEGER", (err) => {
 db.run("ALTER TABLE notes ADD COLUMN telegram_chat_id INTEGER", (err) => {
   if (err && !String(err.message).includes("duplicate column name")) {
     console.error("Ошибка при добавлении колонки telegram_chat_id:", err.message);
+  }
+});
+
+db.run("ALTER TABLE notes ADD COLUMN likes INTEGER DEFAULT 0", (err) => {
+  if (err && !String(err.message).includes("duplicate column name")) {
+    console.error("Ошибка при добавлении колонки likes:", err.message);
   }
 });
 
@@ -135,6 +172,44 @@ bot.on("message", (msg) => {
 app.get("/notes", (req,res)=>{
   db.all("SELECT * FROM notes ORDER BY id DESC",(err,rows)=>{
     res.json(rows);
+  });
+});
+
+// лайки по стикеру
+app.post("/notes/:id/like", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ ok: false });
+  }
+
+  db.get("SELECT * FROM notes WHERE id = ?", [id], (err, row) => {
+    if (err || !row) {
+      return res.status(404).json({ ok: false });
+    }
+
+    const currentLikes = row.likes || 0;
+    const nextLikes = currentLikes + 1;
+
+    db.run("UPDATE notes SET likes = ? WHERE id = ?", [nextLikes, id], (updErr) => {
+      if (updErr) {
+        return res.status(500).json({ ok: false });
+      }
+
+      // уведомление автору в телеграм
+      if (row.telegram_chat_id && row.telegram_message_id) {
+        const snippet = String(row.text || "").slice(0, 80);
+        const msgText =
+          snippet.length > 0
+            ? `Вашей заметке "${snippet}" поставили лайк ❤️`
+            : "Вашей заметке поставили лайк ❤️";
+
+        bot.sendMessage(row.telegram_chat_id, msgText, {
+          reply_to_message_id: row.telegram_message_id
+        }).catch(()=>{});
+      }
+
+      res.json({ ok: true, likes: nextLikes });
+    });
   });
 });
 
