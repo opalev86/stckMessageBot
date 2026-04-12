@@ -1,6 +1,186 @@
 const notesContainer = document.getElementById("notes");
 let loadedNotes = new Set(); // чтобы не менять старые
 let firstLoad = true;
+let scheduleBoardCanvasResize = () => {};
+
+function setupBoardDrawing() {
+  const canvas = document.createElement("canvas");
+  canvas.id = "board-canvas";
+  notesContainer.prepend(canvas);
+
+  const ctx = canvas.getContext("2d");
+  let drawing = false;
+
+  let saveBoardTimer = null;
+  function scheduleSaveBoard() {
+    clearTimeout(saveBoardTimer);
+    saveBoardTimer = setTimeout(() => {
+      if (!canvas.width || !canvas.height) return;
+      const imageData = canvas.toDataURL("image/png");
+      if (imageData.length < 200) return;
+      fetch("/doodle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageData }),
+      }).catch(() => {});
+    }, 700);
+  }
+
+  function dpr() {
+    return Math.min(window.devicePixelRatio || 1, 2);
+  }
+
+  function applyStrokeStyle() {
+    const r = dpr();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(235,235,235,0.9)";
+    ctx.lineWidth = 3 * r;
+  }
+
+  function boardSize() {
+    const w = notesContainer.clientWidth;
+    const h = Math.max(
+      notesContainer.scrollHeight,
+      notesContainer.clientHeight,
+      window.innerHeight
+    );
+    return { w, h };
+  }
+
+  function syncSize() {
+    const { w, h } = boardSize();
+    const r = dpr();
+    const newW = Math.max(1, Math.floor(w * r));
+    const newH = Math.max(1, Math.floor(h * r));
+
+    if (canvas.width === newW && canvas.height === newH) return;
+
+    let snap = null;
+    if (canvas.width > 0 && canvas.height > 0) {
+      snap = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }
+
+    canvas.width = newW;
+    canvas.height = newH;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+
+    if (snap) {
+      const t = document.createElement("canvas");
+      t.width = snap.width;
+      t.height = snap.height;
+      t.getContext("2d").putImageData(snap, 0, 0);
+      ctx.drawImage(t, 0, 0);
+    }
+
+    applyStrokeStyle();
+  }
+
+  function posFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  }
+
+  function posFromTouch(touch) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (touch.clientX - rect.left) * scaleX,
+      y: (touch.clientY - rect.top) * scaleY,
+    };
+  }
+
+  function wireDrawingEvents() {
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      drawing = true;
+      const p = posFromEvent(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!drawing) return;
+      const p = posFromEvent(e);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    });
+
+    window.addEventListener("mouseup", () => {
+      const was = drawing;
+      drawing = false;
+      ctx.beginPath();
+      if (was) scheduleSaveBoard();
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      drawing = true;
+      const p = posFromTouch(e.touches[0]);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }, { passive: false });
+
+    window.addEventListener("touchmove", (e) => {
+      if (!drawing || e.touches.length !== 1) return;
+      e.preventDefault();
+      const p = posFromTouch(e.touches[0]);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }, { passive: false });
+
+    window.addEventListener("touchend", () => {
+      const was = drawing;
+      drawing = false;
+      ctx.beginPath();
+      if (was) scheduleSaveBoard();
+    });
+  }
+
+  syncSize();
+  window.addEventListener("resize", () => syncSize());
+
+  let resizeTimer = null;
+  function scheduleSync() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(syncSize, 150);
+  }
+  scheduleBoardCanvasResize = scheduleSync;
+
+  fetch("/doodle")
+    .then((r) => r.json())
+    .then((data) => {
+      if (!(data && data.imageData)) return;
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          applyStrokeStyle();
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = data.imageData;
+      });
+    })
+    .catch(() => {})
+    .finally(() => {
+      wireDrawingEvents();
+    });
+}
 
 function escapeHtml(s) {
   return String(s)
@@ -217,7 +397,10 @@ async function loadNotes(){
 
   // обновляем список авторов на фоне
   renderAuthorsBackground(notes);
+
+  scheduleBoardCanvasResize();
 }
 
+setupBoardDrawing();
 loadNotes();
 setInterval(loadNotes, 3000); // автообновление

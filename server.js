@@ -6,7 +6,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));
 app.use(express.static("public"));
 
 const db = new sqlite3.Database("database.db");
@@ -82,6 +82,14 @@ db.run("ALTER TABLE notes ADD COLUMN photo_file_id TEXT", (err) => {
     console.error("Ошибка при добавлении колонки photo_file_id:", err.message);
   }
 });
+
+db.run(`
+CREATE TABLE IF NOT EXISTS board_drawing (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  image_data TEXT NOT NULL
+)
+`);
+db.run(`INSERT OR IGNORE INTO board_drawing (id, image_data) VALUES (1, '')`);
 
 // токен берём из переменной окружения или отдельного файла
 let TOKEN = process.env.TELEGRAM_TOKEN;
@@ -195,6 +203,39 @@ app.get("/notes", (req,res)=>{
   db.all("SELECT * FROM notes ORDER BY id DESC",(err,rows)=>{
     res.json(rows);
   });
+});
+
+// сохранённый рисунок на доске (PNG data URL)
+app.get("/doodle", (req, res) => {
+  db.get("SELECT image_data FROM board_drawing WHERE id = 1", (err, row) => {
+    if (err || !row || typeof row.image_data !== "string" || row.image_data.length < 80) {
+      return res.json({ imageData: null });
+    }
+    if (!row.image_data.startsWith("data:image/png;base64,")) {
+      return res.json({ imageData: null });
+    }
+    res.json({ imageData: row.image_data });
+  });
+});
+
+app.post("/doodle", (req, res) => {
+  const imageData = req.body && req.body.imageData;
+  if (typeof imageData !== "string" || !imageData.startsWith("data:image/png;base64,")) {
+    return res.status(400).json({ ok: false });
+  }
+  if (imageData.length > 18 * 1024 * 1024) {
+    return res.status(413).json({ ok: false });
+  }
+  db.run(
+    "INSERT OR REPLACE INTO board_drawing (id, image_data) VALUES (1, ?)",
+    [imageData],
+    (saveErr) => {
+      if (saveErr) {
+        return res.status(500).json({ ok: false });
+      }
+      res.json({ ok: true });
+    }
+  );
 });
 
 // картинка заметки (прокси из Telegram, токен не светится в браузере)
