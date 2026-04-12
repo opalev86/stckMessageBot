@@ -1,5 +1,6 @@
 
 const express = require("express");
+const https = require("https");
 const sqlite3 = require("sqlite3").verbose();
 const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
@@ -76,6 +77,11 @@ db.run("ALTER TABLE notes ADD COLUMN likes INTEGER DEFAULT 0", (err) => {
     console.error("Ошибка при добавлении колонки likes:", err.message);
   }
 });
+db.run("ALTER TABLE notes ADD COLUMN photo_file_id TEXT", (err) => {
+  if (err && !String(err.message).includes("duplicate column name")) {
+    console.error("Ошибка при добавлении колонки photo_file_id:", err.message);
+  }
+});
 
 // токен берём из переменной окружения или отдельного файла
 let TOKEN = process.env.TELEGRAM_TOKEN;
@@ -93,12 +99,13 @@ const bot = new TelegramBot(TOKEN, { polling: true });
 // Обработка сообщений
 bot.on("message", (msg) => {
   const text = msg.text || "";
+  const caption = msg.caption || "";
 
   // приветствие и подсказка
   if (text === "/start") {
     bot.sendMessage(
       msg.chat.id,
-      "Привет! Просто напишите мне сообщение — оно появится на доске.\n\n" +
+      "Привет! Напишите сообщение или отправьте фото — оно появится на доске.\n\n" +
       "Чтобы удалить свою заметку, ответьте на исходное сообщение командой /delete."
     );
     return;
@@ -149,7 +156,6 @@ bot.on("message", (msg) => {
     return;
   }
 
-  // обычная заметка
   const colors = ["#fff59d","#ffe082","#ffd54f"];
   const color = colors[Math.floor(Math.random()*colors.length)];
 
@@ -162,6 +168,22 @@ bot.on("message", (msg) => {
   const messageId = msg.message_id || null;
   const chatId = msg.chat && msg.chat.id ? msg.chat.id : null;
 
+  // фото — на доску с картинкой (подпись опциональна)
+  const photos = msg.photo;
+  if (photos && photos.length > 0) {
+    const largest = photos[photos.length - 1];
+    const fileId = largest.file_id;
+    const noteText = caption || "";
+    db.run(
+      "INSERT INTO notes (text, color, author, telegram_message_id, telegram_user_id, telegram_chat_id, photo_file_id) VALUES (?,?,?,?,?,?,?)",
+      [noteText, color, author, messageId, userId, chatId, fileId]
+    );
+    return;
+  }
+
+  // обычная текстовая заметка
+  if (!text) return;
+
   db.run(
     "INSERT INTO notes (text, color, author, telegram_message_id, telegram_user_id, telegram_chat_id) VALUES (?,?,?,?,?,?)",
     [text, color, author, messageId, userId, chatId]
@@ -172,6 +194,38 @@ bot.on("message", (msg) => {
 app.get("/notes", (req,res)=>{
   db.all("SELECT * FROM notes ORDER BY id DESC",(err,rows)=>{
     res.json(rows);
+  });
+});
+
+// картинка заметки (прокси из Telegram, токен не светится в браузере)
+app.get("/note-photo/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).end();
+  }
+  db.get("SELECT photo_file_id FROM notes WHERE id = ?", [id], (err, row) => {
+    if (err || !row || !row.photo_file_id) {
+      return res.status(404).end();
+    }
+    bot.getFile(row.photo_file_id)
+      .then((file) => {
+        const path = file.file_path;
+        if (!path) {
+          return res.status(404).end();
+        }
+        const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${path}`;
+        https.get(fileUrl, (tgRes) => {
+          const ct = tgRes.headers["content-type"] || "image/jpeg";
+          res.setHeader("Content-Type", ct);
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          tgRes.pipe(res);
+        }).on("error", () => {
+          if (!res.headersSent) res.status(502).end();
+        });
+      })
+      .catch(() => {
+        if (!res.headersSent) res.status(500).end();
+      });
   });
 });
 
@@ -200,8 +254,10 @@ app.post("/notes/:id/like", (req, res) => {
         const snippet = String(row.text || "").slice(0, 80);
         const msgText =
           snippet.length > 0
-            ? `Вашей заметке "${snippet}" поставили лайк ❤️`
-            : "Вашей заметке поставили лайк ❤️";
+            ? `Вашей заметке "${snippet}" поставили лайк 👍`
+            : row.photo_file_id
+              ? "Вашей заметке с фото поставили лайк 👍"
+              : "Вашей заметке поставили лайк 👍";
 
         bot.sendMessage(row.telegram_chat_id, msgText, {
           reply_to_message_id: row.telegram_message_id

@@ -1,6 +1,14 @@
 const notesContainer = document.getElementById("notes");
 let loadedNotes = new Set(); // чтобы не менять старые
 let firstLoad = true;
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 const renderedAuthors = new Set(); // чтобы авторы не «прыгали»
 let watermarkRendered = false;
 let visitorsSource = null;
@@ -136,7 +144,14 @@ async function loadNotes(){
     const likes = typeof n.likes === "number" ? n.likes : 0;
     const likeEl = `<div class="note-like">👍 ${likes}</div>`;
 
-    div.innerHTML = `${authorEl}<div class="note-text">${n.text}</div>${likeEl}`;
+    const photoEl = n.photo_file_id
+      ? `<img class="note-photo" src="/note-photo/${n.id}" alt="">`
+      : "";
+    const textBody = n.text
+      ? `<div class="note-text">${escapeHtml(n.text)}</div>`
+      : "";
+
+    div.innerHTML = `${authorEl}${photoEl}${textBody}${likeEl}`;
     div.style.background = n.color || "#ffeb3b";
 
     if(firstLoad){
