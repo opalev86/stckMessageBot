@@ -59,6 +59,10 @@ button{
   cursor: url("chalk-cursor.svg") 8 24, crosshair;
 }
 
+#board-canvas.board-eraser{
+  cursor: cell;
+}
+
 #notes::after{
   content: "в создании принимали участие: chatgtp и cursor ai)";
   position: absolute;

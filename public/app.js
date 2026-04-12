@@ -10,6 +10,7 @@ function setupBoardDrawing() {
 
   const ctx = canvas.getContext("2d");
   let drawing = false;
+  let drawButton = null;
 
   let saveBoardTimer = null;
   function scheduleSaveBoard() {
@@ -32,10 +33,20 @@ function setupBoardDrawing() {
 
   function applyStrokeStyle() {
     const r = dpr();
+    ctx.globalCompositeOperation = "source-over";
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = "rgba(235,235,235,0.9)";
     ctx.lineWidth = 3 * r;
+  }
+
+  function applyEraseStyle() {
+    const r = dpr();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.lineWidth = 16 * r;
   }
 
   function boardSize() {
@@ -101,11 +112,25 @@ function setupBoardDrawing() {
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
     canvas.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      drawing = true;
-      const p = posFromEvent(e);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
+      if (e.button === 0) {
+        if (drawing) return;
+        drawing = true;
+        drawButton = 0;
+        applyStrokeStyle();
+        const p = posFromEvent(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      } else if (e.button === 2) {
+        e.preventDefault();
+        if (drawing) return;
+        drawing = true;
+        drawButton = 2;
+        canvas.classList.add("board-eraser");
+        applyEraseStyle();
+        const p = posFromEvent(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      }
     });
 
     window.addEventListener("mousemove", (e) => {
@@ -117,11 +142,15 @@ function setupBoardDrawing() {
       ctx.moveTo(p.x, p.y);
     });
 
-    window.addEventListener("mouseup", () => {
-      const was = drawing;
+    window.addEventListener("mouseup", (e) => {
+      if (!drawing || drawButton === null) return;
+      if (e.button !== drawButton) return;
       drawing = false;
+      drawButton = null;
+      canvas.classList.remove("board-eraser");
       ctx.beginPath();
-      if (was) scheduleSaveBoard();
+      applyStrokeStyle();
+      scheduleSaveBoard();
     });
 
     canvas.addEventListener("touchstart", (e) => {
